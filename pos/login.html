@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Shop POS - Login</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card" style="max-width: 400px; margin: 100px auto;">
+            <h1 style="text-align: center; color: var(--primary-green); margin-bottom: 30px;">Coffee Shop POS</h1>
+            <h3 style="text-align: center; margin-bottom: 20px;">Select Your Role</h3>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button class="btn" onclick="login('admin')">Admin</button>
+                <button class="btn" onclick="login('cashier')">Cashier</button>
+                <button class="btn" onclick="login('kitchen')">Kitchen Staff</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/data.js"></script>
+    <script>
+        function login(role) {
+            localStorage.setItem('currentRole', role);
+            if (role === 'admin') {
+                window.location.href = 'pages/admin/dashboard.html';
+            } else if (role === 'cashier') {
+                window.location.href = 'pages/cashier/dashboard.html';
+            } else if (role === 'kitchen') {
+                window.location.href = 'pages/kitchen/dashboard.html';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Sales - Coffee Shop POS</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body onload="loadSales()">
+    <div class="container">
+        <div class="header">
+            <h1>Coffee Shop POS - Kitchen</h1>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="sidebar">
+                <ul>
+                    <li><a href="dashboard.html">Dashboard</a></li>
+                    <li><a href="pos.html">POS</a></li>
+                    <li><a href="orders.html">Orders</a></li>
+                    <li><a href="menus.html">Menus</a></li>
+                    <li><a href="sales.html" class="active">Sales</a></li>
+                    <li><a href="settings.html">Settings</a></li>
+                </ul>
+            </div>
+
+            <div class="main-content">
+                <h2>Sales</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Items Cooked Today</h3>
+                        <ul id="items-cooked"></ul>
+                    </div>
+                    <div class="card">
+                        <h3>Most Prepared Menu</h3>
+                        <p id="most-prepared">None</p>
+                    </div>
+                    <div class="card">
+                        <h3>Busy Hours</h3>
+                        <p id="busy-hours">None</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/js/data.js"></script>
+    <script src="../../assets/js/kitchen.js"></script>
+</body>
+</html>
