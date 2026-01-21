@@ -32,6 +32,42 @@ if (!empty($params)) {
 }
 $stmt->execute();
 $reports = $stmt->get_result();
+
+// Query Laporan Metode Pembayaran
+$query_payment = "SELECT payment_method, COUNT(*) as total_orders, SUM(total_price) as revenue 
+                  FROM orders 
+                  WHERE status != 'cancelled'";
+
+$params_pay = [];
+$types_pay = "";
+
+if (!empty($start_date) && !empty($end_date)) {
+    $query_payment .= " AND DATE(created_at) BETWEEN ? AND ?";
+    $params_pay[] = $start_date;
+    $params_pay[] = $end_date;
+    $types_pay .= "ss";
+}
+
+$query_payment .= " GROUP BY payment_method ORDER BY revenue DESC";
+$stmt_pay = $conn->prepare($query_payment);
+if (!empty($params_pay)) {
+    $stmt_pay->bind_param($types_pay, ...$params_pay);
+}
+$stmt_pay->execute();
+$payment_result = $stmt_pay->get_result();
+
+$payment_data = [];
+while ($row = mysqli_fetch_assoc($payment_result)) {
+    $payment_data[] = $row;
+}
+
+// Siapkan Data untuk Grafik
+$chart_labels = [];
+$chart_values = [];
+foreach ($payment_data as $p) {
+    $chart_labels[] = $p['payment_method'] ?? 'Cash';
+    $chart_values[] = $p['revenue'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -41,6 +77,7 @@ $reports = $stmt->get_result();
     <meta charset="UTF-8">
     <title>Laporan Penjualan - Admin Coffee Shop</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -112,7 +149,86 @@ $reports = $stmt->get_result();
                 </tbody>
             </table>
         </div>
+
+        <!-- Laporan Metode Pembayaran -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-50 flex justify-between items-center">
+                    <div>
+                        <h2 class="font-bold text-slate-800">Metode Pembayaran</h2>
+                        <p class="text-xs text-slate-500">Rincian pendapatan berdasarkan tipe pembayaran.</p>
+                    </div>
+                    <div class="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-400 text-[11px] uppercase tracking-widest">
+                            <th class="p-4 font-semibold">Metode</th>
+                            <th class="p-4 font-semibold">Transaksi</th>
+                            <th class="p-4 font-semibold">Pendapatan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-600 text-sm">
+                        <?php if (!empty($payment_data)): ?>
+                            <?php foreach ($payment_data as $row): ?>
+                                <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                    <td class="p-4 font-bold text-slate-700"><?= $row['payment_method'] ?? 'Cash' ?></td>
+                                    <td class="p-4"><?= $row['total_orders'] ?></td>
+                                    <td class="p-4 font-bold text-green-600">Rp <?= number_format($row['revenue'], 0, ',', '.') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="3" class="p-8 text-center text-slate-400">Belum ada data pembayaran.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Grafik Pie Chart -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                <h2 class="font-bold text-slate-800 mb-4">Persentase Pendapatan</h2>
+                <div class="flex-1 relative min-h-[300px]">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <script>
+        const ctx = document.getElementById('paymentChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: <?= json_encode($chart_labels) ?>,
+                datasets: [{
+                    data: <?= json_encode($chart_values) ?>,
+                    backgroundColor: [
+                        '#ea580c', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>

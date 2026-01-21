@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "db_coffeeshop";
+$db   = "coffee_shop_pos";
 
 // MySQLi Connection
 $conn = mysqli_connect($host, $user, $pass, $db);

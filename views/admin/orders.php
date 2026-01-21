@@ -59,8 +59,10 @@ $orders = mysqli_query($conn, $query);
                 <thead>
                     <tr class="bg-slate-50 text-slate-400 text-[11px] uppercase tracking-widest">
                         <th class="p-4 font-semibold">ID Order</th>
+                        <th class="p-4 font-semibold">Pelanggan</th>
                         <th class="p-4 font-semibold">Kasir</th>
                         <th class="p-4 font-semibold">Total Harga</th>
+                        <th class="p-4 font-semibold">Metode</th>
                         <th class="p-4 font-semibold">Status</th>
                         <th class="p-4 font-semibold">Waktu</th>
                         <th class="p-4 font-semibold text-center">Aksi</th>
@@ -71,8 +73,10 @@ $orders = mysqli_query($conn, $query);
                         <?php while ($row = mysqli_fetch_assoc($orders)): ?>
                             <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
                                 <td class="p-4 font-bold text-slate-700">#<?= $row['id'] ?></td>
+                                <td class="p-4 font-semibold text-slate-600"><?= $row['customer_name'] ?? '-' ?></td>
                                 <td class="p-4"><?= ucfirst($row['cashier_name']) ?></td>
                                 <td class="p-4 font-bold text-orange-600">Rp <?= number_format($row['total_price'], 0, ',', '.') ?></td>
+                                <td class="p-4 text-xs font-bold text-slate-500"><?= $row['payment_method'] ?? 'Cash' ?></td>
                                 <td class="p-4">
                                     <?php
                                     $statusColor = match ($row['status']) {
@@ -100,7 +104,7 @@ $orders = mysqli_query($conn, $query);
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="p-8 text-center text-slate-400">Belum ada data pesanan.</td>
+                            <td colspan="6" class="p-8 text-center text-slate-400">Belum ada data pesanan.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

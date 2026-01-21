@@ -31,7 +31,8 @@ mysqli_data_seek($items_query, 0); // Reset pointer query
 while ($item = mysqli_fetch_assoc($items_query)) {
     $subtotal += $item['price'] * $item['quantity'];
 }
-$tax = $order['total_price'] - $subtotal;
+$discount = $order['discount'] ?? 0;
+$taxable = $subtotal - $discount;
 
 // Ambil Pengaturan Toko
 $settings_query = mysqli_query($conn, "SELECT * FROM settings LIMIT 1");
@@ -42,6 +43,7 @@ $store_name = $settings['store_name'] ?? 'LAHAULA COFFEE';
 $store_address = $settings['store_address'] ?? 'Alamat Toko Belum Diatur';
 $store_phone = $settings['store_phone'] ?? '';
 $footer_note = $settings['footer_note'] ?? 'Terima Kasih Atas Kunjungan Anda!';
+$store_logo = $settings['logo'] ?? null;
 ?>
 
 <!DOCTYPE html>
@@ -81,6 +83,9 @@ $footer_note = $settings['footer_note'] ?? 'Terima Kasih Atas Kunjungan Anda!';
 
     <div id="receipt" class="receipt-container w-full max-w-sm bg-white p-6 rounded-lg shadow-xl border">
         <div class="text-center mb-6">
+            <?php if (!empty($store_logo) && file_exists(__DIR__ . '/../../assets/images/' . $store_logo)): ?>
+                <img src="../../assets/images/<?= $store_logo ?>" alt="Logo" class="w-20 h-20 object-contain mx-auto mb-2 grayscale">
+            <?php endif; ?>
             <h1 class="text-2xl font-bold uppercase"><?= $store_name ?></h1>
             <p class="text-xs"><?= $store_address ?></p>
             <?php if ($store_phone): ?><p class="text-xs">Telp: <?= $store_phone ?></p><?php endif; ?>
@@ -89,7 +94,13 @@ $footer_note = $settings['footer_note'] ?? 'Terima Kasih Atas Kunjungan Anda!';
         <div class="text-xs border-t border-b border-dashed border-black py-2 mb-4">
             <div class="flex justify-between"><span>Order ID:</span><span>#<?= $order['id'] ?></span></div>
             <div class="flex justify-between"><span>Tanggal:</span><span><?= date('d/m/Y H:i', strtotime($order['created_at'])) ?></span></div>
+            <div class="flex justify-between"><span>Pelanggan:</span><span><?= $order['customer_name'] ?? 'Umum' ?></span></div>
+            <div class="flex justify-between"><span>Tipe:</span><span><?= ($order['order_type'] == 'dine_in') ? 'Dine In' : 'Take Away' ?></span></div>
+            <?php if ($order['order_type'] == 'dine_in' && !empty($order['table_number'])): ?>
+                <div class="flex justify-between"><span>Meja:</span><span>No. <?= $order['table_number'] ?></span></div>
+            <?php endif; ?>
             <div class="flex justify-between"><span>Kasir:</span><span><?= ucfirst($order['cashier_name']) ?></span></div>
+            <div class="flex justify-between"><span>Metode:</span><span class="font-bold"><?= $order['payment_method'] ?? 'Cash' ?></span></div>
         </div>
 
         <div>
@@ -108,7 +119,9 @@ $footer_note = $settings['footer_note'] ?? 'Terima Kasih Atas Kunjungan Anda!';
 
         <div class="text-xs border-t border-dashed border-black mt-4 pt-2">
             <div class="flex justify-between"><span>Subtotal</span><span><?= number_format($subtotal, 0, ',', '.') ?></span></div>
-            <div class="flex justify-between"><span>Pajak (10%)</span><span><?= number_format($tax, 0, ',', '.') ?></span></div>
+            <?php if ($discount > 0): ?>
+                <div class="flex justify-between"><span>Diskon</span><span>-<?= number_format($discount, 0, ',', '.') ?></span></div>
+            <?php endif; ?>
             <div class="flex justify-between font-bold text-sm mt-2 pt-2 border-t border-black">
                 <span>TOTAL</span>
                 <span>Rp <?= number_format($order['total_price'], 0, ',', '.') ?></span>

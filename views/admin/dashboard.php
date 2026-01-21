@@ -80,6 +80,28 @@ if ($view === 'dashboard') {
         $chart_labels[] = date('d M', strtotime($d));
         $chart_data[] = $sales_data[$d] ?? 0;
     }
+
+    // Ambil Detail Produk Stok Menipis untuk Notifikasi Admin
+    $low_stock_items = [];
+    if ($summary['low_stock'] > 0) {
+        $ls_query = mysqli_query($conn, "SELECT id, name, stock FROM products WHERE stock <= 5 ORDER BY stock ASC");
+        while($ls_row = mysqli_fetch_assoc($ls_query)) {
+            $low_stock_items[] = $ls_row;
+        }
+    }
+}
+
+// Handle Quick Stock Update (Dari Notifikasi Dashboard)
+if (isset($_POST['quick_update_stock'])) {
+    $id = (int)$_POST['product_id'];
+    $added_stock = (int)$_POST['added_stock'];
+    if ($added_stock > 0) {
+        $stmt = $conn->prepare("UPDATE products SET stock = stock + ? WHERE id = ?");
+        $stmt->bind_param("ii", $added_stock, $id);
+        $stmt->execute();
+        echo "<script>alert('Stok berhasil ditambahkan!'); window.location.href='dashboard.php';</script>";
+        exit;
+    }
 }
 
 // Handle Checkout (Proses Transaksi)
@@ -165,6 +187,40 @@ if (isset($_POST['process_order'])) {
                 </div>
                 <div class="h-10 w-10 bg-orange-200 rounded-full flex items-center justify-center font-bold text-orange-700 text-sm">AD</div>
             </header>
+
+            <!-- Notifikasi Stok Menipis (Admin) -->
+            <?php if (!empty($low_stock_items)): ?>
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded-r-xl shadow-sm">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-500 animate-pulse" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3 w-full">
+                        <h3 class="text-sm leading-5 font-bold text-red-800">
+                            PERHATIAN: Stok Produk Menipis!
+                        </h3>
+                        <div class="mt-2 text-sm leading-5 text-red-700">
+                            <ul class="space-y-2">
+                                <?php foreach ($low_stock_items as $item): ?>
+                                    <li class="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-red-100">
+                                        <span><b><?= $item['name'] ?></b> (Sisa: <?= $item['stock'] ?>)</span>
+                                        <form method="POST" class="flex items-center gap-2">
+                                            <input type="hidden" name="product_id" value="<?= $item['id'] ?>">
+                                            <input type="number" name="added_stock" class="w-24 text-xs border border-red-300 rounded px-2 py-1 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" placeholder="Tambah Stok" min="1" required>
+                                            <button type="submit" name="quick_update_stock" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1 rounded transition shadow-sm">
+                                                Simpan
+                                            </button>
+                                        </form>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Ringkasan Cepat -->
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
@@ -463,6 +519,9 @@ if (isset($_POST['process_order'])) {
         function renderCart() {
             const cartContainer = document.getElementById('cart-list');
             const badge = document.getElementById('cart-badge');
+
+            // Cegah error jika elemen keranjang tidak ada (misal sedang di halaman Dashboard Ringkasan)
+            if (!cartContainer || !badge) return;
 
             if (cart.length > 0) {
                 badge.innerText = cart.reduce((acc, item) => acc + item.qty, 0);

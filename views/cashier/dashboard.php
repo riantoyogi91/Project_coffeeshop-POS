@@ -7,6 +7,24 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
     exit;
 }
 
+// Cek dan buat kolom payment_method jika belum ada
+try {
+    $check_pay = mysqli_query($conn, "SHOW COLUMNS FROM orders LIKE 'payment_method'");
+    if (mysqli_num_rows($check_pay) == 0) {
+        mysqli_query($conn, "ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'Cash' AFTER status");
+    }
+    // Cek dan buat kolom order_type dan table_number jika belum ada
+    $check_type = mysqli_query($conn, "SHOW COLUMNS FROM orders LIKE 'order_type'");
+    if (mysqli_num_rows($check_type) == 0) {
+        mysqli_query($conn, "ALTER TABLE orders ADD COLUMN order_type ENUM('dine_in', 'take_away') DEFAULT 'dine_in' AFTER payment_method");
+    }
+    $check_table = mysqli_query($conn, "SHOW COLUMNS FROM orders LIKE 'table_number'");
+    if (mysqli_num_rows($check_table) == 0) {
+        mysqli_query($conn, "ALTER TABLE orders ADD COLUMN table_number VARCHAR(10) NULL AFTER order_type");
+    }
+} catch (Exception $e) {
+}
+
 // Ambil data produk dari database
 $query = "SELECT * FROM products ORDER BY category ASC";
 $products = mysqli_query($conn, $query);
@@ -25,14 +43,16 @@ if (isset($_POST['process_order'])) {
                 $total_price += $item['price'] * $item['qty'];
             }
 
-            // Hitung Pajak & Total
-            $tax = $total_price * 0.1;
-            $final_total = $total_price + $tax;
+            // Hitung Total (Tanpa Pajak)
+            $final_total = $total_price;
             $user_id = $_SESSION['user_id'];
+            $payment_method = $_POST['payment_method'] ?? 'Cash';
+            $order_type = $_POST['order_type'] ?? 'dine_in';
+            $table_number = !empty($_POST['table_number']) ? $_POST['table_number'] : null;
 
             // 1. Simpan ke tabel orders
-            $stmt = $conn->prepare("INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, 'pending')");
-            $stmt->bind_param("id", $user_id, $final_total);
+            $stmt = $conn->prepare("INSERT INTO orders (user_id, total_price, status, payment_method, order_type, table_number) VALUES (?, ?, 'pending', ?, ?, ?)");
+            $stmt->bind_param("idsss", $user_id, $final_total, $payment_method, $order_type, $table_number);
             $stmt->execute();
             $order_id = $stmt->insert_id;
 
@@ -74,8 +94,17 @@ if (isset($_POST['process_order'])) {
             font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
         }
     </style>
 </head>
@@ -138,34 +167,99 @@ if (isset($_POST['process_order'])) {
             <div class="h-10 w-10 bg-orange-200 rounded-full flex items-center justify-center font-bold text-orange-700 text-sm">CS</div>
         </div>
 
-        <div id="cart-list" class="flex-1 overflow-y-auto p-6 space-y-4 hide-scrollbar">
+        <div id="cart-list" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-0">
             <div class="text-center py-10">
                 <p class="text-gray-400">Keranjang masih kosong</p>
             </div>
         </div>
 
-        <div class="p-6 bg-gray-50 space-y-3">
-            <div class="flex justify-between text-gray-600">
-                <span>Subtotal</span>
-                <span id="subtotal">Rp 0</span>
-            </div>
-            <div class="flex justify-between text-gray-600 border-b pb-3">
-                <span>Pajak (10%)</span>
-                <span id="tax">Rp 0</span>
-            </div>
-            <div class="flex justify-between text-2xl font-black text-orange-900 pt-2">
-                <span>Total</span>
-                <span id="total-price">Rp 0</span>
+        <div class="p-4 bg-white space-y-3 border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+
+            <!-- Baris 1: Tipe Pesanan & Metode Pembayaran (Compact) -->
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Tipe Pesanan -->
+                <div class="bg-slate-100 p-1 rounded-lg flex">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="order_type" value="dine_in" class="peer sr-only" onchange="toggleTableInput()" checked>
+                        <div class="text-center py-2 rounded-md text-slate-500 peer-checked:bg-white peer-checked:text-orange-600 peer-checked:shadow-sm transition-all text-[10px] font-bold flex items-center justify-center">
+                            Makan
+                        </div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="order_type" value="take_away" class="peer sr-only" onchange="toggleTableInput()">
+                        <div class="text-center py-2 rounded-md text-slate-500 peer-checked:bg-white peer-checked:text-orange-600 peer-checked:shadow-sm transition-all text-[10px] font-bold flex items-center justify-center">
+                            Bawa
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Metode Pembayaran -->
+                <div class="relative">
+                    <select id="payment-method" class="w-full h-full pl-8 pr-2 bg-slate-100 border-none rounded-lg text-xs font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none appearance-none" onchange="handlePaymentMethodChange()">
+                        <option value="Cash">Tunai</option>
+                        <option value="QRIS">QRIS</option>
+                        <option value="Debit">Debit</option>
+                        <option value="Credit">Credit</option>
+                    </select>
+                    <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                        </svg>
+                    </div>
+                </div>
             </div>
 
-            <button onclick="checkout()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 mt-4 transition-all active:scale-95">
-                PROSES TRANSAKSI
+            <!-- Input Meja (Conditional) -->
+            <div id="table-input-container" class="transition-all duration-300 overflow-hidden">
+                <div class="relative flex items-center">
+                    <div class="absolute left-3 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                        </svg>
+                    </div>
+                    <input type="number" id="table-number" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none placeholder-slate-400" placeholder="Nomor Meja">
+                </div>
+            </div>
+
+            <!-- Info Pembayaran (Card Dark) -->
+            <div class="bg-slate-900 p-4 rounded-xl text-white shadow-lg">
+                <!-- Total & Subtotal -->
+                <div class="flex justify-between items-end mb-3">
+                    <div>
+                        <span id="subtotal" class="text-[10px] text-slate-400 block">Rp 0</span>
+                        <span class="text-xs font-bold text-slate-200">Total Tagihan</span>
+                    </div>
+                    <span id="total-price" class="text-2xl font-bold text-white leading-none">Rp 0</span>
+                </div>
+
+                <!-- Input & Kembalian Grid -->
+                <div class="grid grid-cols-2 gap-4 border-t border-slate-700 pt-3">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block mb-1">Uang Masuk</span>
+                        <div class="flex items-center bg-slate-800 rounded px-2 py-1 border border-slate-700 focus-within:border-orange-500 transition-colors">
+                            <span class="text-slate-500 text-xs mr-1">Rp</span>
+                            <input type="number" id="amount-given" class="w-full bg-transparent text-white text-sm font-bold outline-none placeholder-slate-600" placeholder="0" oninput="calculateChange()">
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 block mb-1">Kembalian</span>
+                        <span id="change-amount" class="text-sm font-bold text-orange-400">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="checkout()" class="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-orange-200 transition-all transform active:scale-95 flex justify-center items-center gap-2 text-sm">
+                <span>Bayar & Cetak</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
             </button>
         </div>
     </aside>
 
     <script>
         let cart = [];
+        let currentTotal = 0;
 
         // Muat keranjang dari localStorage jika ada
         if (localStorage.getItem('cashier_pos_cart')) {
@@ -267,11 +361,47 @@ if (isset($_POST['process_order'])) {
         }
 
         function updateTotals(subtotal) {
-            const tax = subtotal * 0.1;
-            const total = subtotal + tax;
+            currentTotal = subtotal; // Tanpa pajak
             document.getElementById('subtotal').innerText = 'Rp ' + subtotal.toLocaleString('id-ID');
-            document.getElementById('tax').innerText = 'Rp ' + tax.toLocaleString('id-ID');
-            document.getElementById('total-price').innerText = 'Rp ' + total.toLocaleString('id-ID');
+            document.getElementById('total-price').innerText = 'Rp ' + currentTotal.toLocaleString('id-ID');
+            calculateChange();
+        }
+
+        function calculateChange() {
+            const amountGivenInput = document.getElementById('amount-given');
+            const changeDisplay = document.getElementById('change-amount');
+
+            const amountGiven = parseFloat(amountGivenInput.value) || 0;
+            const change = amountGiven - currentTotal;
+
+            changeDisplay.innerText = 'Rp ' + change.toLocaleString('id-ID');
+            if (change < 0) changeDisplay.classList.add('text-red-500');
+            else changeDisplay.classList.remove('text-red-500');
+        }
+
+        function handlePaymentMethodChange() {
+            const method = document.getElementById('payment-method').value;
+            const amountInput = document.getElementById('amount-given');
+
+            if (method !== 'Cash') {
+                amountInput.value = currentTotal;
+                amountInput.readOnly = true;
+            } else {
+                amountInput.value = '';
+                amountInput.readOnly = false;
+            }
+            calculateChange();
+        }
+
+        function toggleTableInput() {
+            const orderType = document.querySelector('input[name="order_type"]:checked').value;
+            const tableContainer = document.getElementById('table-input-container');
+            if (orderType === 'dine_in') {
+                tableContainer.style.display = 'block';
+            } else {
+                tableContainer.style.display = 'none';
+                document.getElementById('table-number').value = '';
+            }
         }
 
         function toggleCart() {
@@ -318,8 +448,26 @@ if (isset($_POST['process_order'])) {
             inputProcess.name = 'process_order';
             inputProcess.value = 'true';
 
+            const inputPayment = document.createElement('input');
+            inputPayment.type = 'hidden';
+            inputPayment.name = 'payment_method';
+            inputPayment.value = document.getElementById('payment-method').value;
+
+            const inputOrderType = document.createElement('input');
+            inputOrderType.type = 'hidden';
+            inputOrderType.name = 'order_type';
+            inputOrderType.value = document.querySelector('input[name="order_type"]:checked').value;
+
+            const inputTableNumber = document.createElement('input');
+            inputTableNumber.type = 'hidden';
+            inputTableNumber.name = 'table_number';
+            inputTableNumber.value = document.getElementById('table-number').value;
+
             form.appendChild(inputCart);
             form.appendChild(inputProcess);
+            form.appendChild(inputPayment);
+            form.appendChild(inputOrderType);
+            form.appendChild(inputTableNumber);
             document.body.appendChild(form);
             form.submit();
         }

@@ -86,8 +86,8 @@ if (isset($conn)) {
             <?php else: ?>
                 <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-100 text-3xl mb-4 shadow-inner">☕</div>
             <?php endif; ?>
-            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Welcome Back</h1>
-            <p class="text-slate-500 text-sm mt-2">Masuk untuk mengelola Coffee Shop</p>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Selamat Datang</h1>
+            <p class="text-slate-500 text-sm mt-2">Mari Mulai Pelayanan Terbaik Anda</p>
         </div>
 
         <?php if ($error): ?>
